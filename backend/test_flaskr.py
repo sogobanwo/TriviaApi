@@ -2,7 +2,9 @@ import os
 import unittest
 import json
 from flask_sqlalchemy import SQLAlchemy
-
+from dotenv import load_dotenv
+from settings import DB_NAME, DB_USER, DB_PASSWORD
+load_dotenv()
 from flaskr import create_app
 from models import setup_db, Question, Category
 
@@ -14,10 +16,18 @@ class TriviaTestCase(unittest.TestCase):
         """Define test variables and initialize app."""
         self.app = create_app()
         self.client = self.app.test_client
+        self.database_username = os.environ.get("database_username")
+        self.database_password = os.environ.get("database_password")
+        self.database_host = os.environ.get("database_host")  
         self.database_name = "trivia_test"
-        self.database_path = "postgres://{}/{}".format('localhost:5432', self.database_name)
+        self.database_path = 'postgresql://{}:{}@{}/{}'.format(self.database_username, self.database_password, self.database_host, self.database_name)
         setup_db(self.app, self.database_path)
-
+        self.new_question = {
+            'question': 'Which year did Nigeria got independent?',
+            'answer': 1990,
+            'category': 1,
+            'difficulty': 5
+        }
         # binds the app to the current context
         with self.app.app_context():
             self.db = SQLAlchemy()
@@ -69,11 +79,9 @@ class TriviaTestCase(unittest.TestCase):
         self.assertTrue(data["total_questions"])
 
     def test_delete_question(self):
-        res = self.client().delete("/questions/4")
-        question = Question.query.filter(Question.id == 2).one_or_none()
-
-        self.assertEqual(res.status_code, 204)
-        self.assertEqual(question, None)
+        response = self.client().delete('/questions/15')
+        self.assertEqual(response.status_code, 200)
+        
 
     def test_404_if_question_does_not_exist_on_delete(self):
         
@@ -85,13 +93,11 @@ class TriviaTestCase(unittest.TestCase):
         self.assertEqual(data['message'], 'resource not found')
 
     def test_create_new_question(self):
-        res = self.client().post("/questions", json={
-            "question": "is Olorunsogo is a boy?",
-            "answer": "True",
-            "difficulty": 3,
-            "category": 3
-        })
-        self.assertEqual(res.status_code, 201)
+        response = self.client().post('/questions', json=self.new_question)
+        data = json.loads(response.data)
+        self.assertTrue(response.status_code, 200)
+        self.assertTrue(data['success'], True)
+        self.assertTrue(data['question_id'])
 
     def test_add_question_without_required_input(self):
 
@@ -115,14 +121,14 @@ class TriviaTestCase(unittest.TestCase):
         self.assertTrue(data["total_questions"])
 
     def test_search_questions_with_no_result(self):
-        
-        res = self.client().post('/questions/search',json={'searchTerm': 'howdy'})
-        data = json.loads(res.data)
-
-        self.assertEqual(res.status_code, 200)
-        self.assertEqual(data['success'], True)
-        self.assertEqual(len(data['questions']), 0)
-        self.assertEqual(data['total_questions'], 0)
+        search_term = {
+            'searchTerm': 'No result found',
+        }
+        response = self.client().post('/search', json=search_term)
+        data = json.loads(response.data)
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(data['success'], False)
+        self.assertEqual(data['message'], 'resource not found')
 
     def test_get_quiz_question_from_all_categories(self):
         res = self.client().post("/quizzes", json={
