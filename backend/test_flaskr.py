@@ -80,7 +80,7 @@ class TriviaTestCase(unittest.TestCase):
 
     def test_delete_question(self):
         response = self.client().delete('/questions/15')
-        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.status_code, 204)
         
 
     def test_404_if_question_does_not_exist_on_delete(self):
